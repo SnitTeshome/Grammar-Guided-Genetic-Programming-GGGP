@@ -1,44 +1,21 @@
-# src/complexity.py
-
-def complexity(expression):
+def evaluate_expression(expr, variable_values):
     """
-    Compute complexity of a Boolean expression.
-    
-    Parameters
-    ----------
-    expression : str
-        Fully expanded Boolean expression (phenotype)
-        
+    Evaluate a Boolean expression (phenotype) given variable assignments.
+
+    expr : str
+        Boolean expression like "NOT (A AND B) OR C"
+    variable_values : dict
+        Mapping from variable names to 0/1 values, e.g., {"A":1, "B":0, "C":1}
+
     Returns
     -------
     int
-        Complexity score (higher = more complex)
+        Result of expression (0 or 1)
     """
-    # Count spaces as a simple proxy for number of operators and terms
-    return expression.count(" ")
+    # Replace variables with their values
+    for var, val in variable_values.items():
+        expr = expr.replace(var, str(val))
 
-
-def final_score(expression, variable_values, alpha=1.0):
-    """
-    Combine fitness and complexity to compute final score.
-
-    Parameters
-    ----------
-    expression : str
-        Phenotype expression
-    variable_values : dict
-        Mapping from variable names to 0/1 values for fitness evaluation
-    alpha : float
-        Weight for complexity penalty
-    
-    Returns
-    -------
-    float
-        Final score: fitness - alpha * complexity
-    """
-    from src.fitness import evaluate_expression
-
-    fitness = evaluate_expression(expression, variable_values)
-    penalty = complexity(expression)
-
-    return fitness - alpha * penalty
+    # Evaluate expression using Python logic operators
+    expr = expr.replace("AND", " and ").replace("OR", " or ").replace("NOT", " not ").replace("XOR", " != ")
+    return int(eval(expr))
