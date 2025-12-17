@@ -1,48 +1,35 @@
-# src/genotype_mapping.py
-
-def map_genotype(genotype, grammar, start_symbol="<expr>"):
+def map_genotype(genotype, grammar, start_symbol="<expr>", max_steps=100):
     """
-    Optimized mapping of an integer genotype to a Boolean expression (phenotype)
-    using grammar-guided expansion.
-
-    Parameters
-    ----------
-    genotype : list of int
-        Sequence of genes guiding production choice.
-    grammar : Grammar
-        Grammar object containing production rules.
-    start_symbol : str, optional
-        Starting non-terminal symbol (default is "<expr>").
-
-    Returns
-    -------
-    str
-        Fully expanded Boolean expression (phenotype).
+    Deterministic and safe grammar-guided genotype → phenotype mapping.
     """
 
-    expression = start_symbol  # Initialize expression with root
-    gene_index = 0             # Start from the first gene
+    expression = start_symbol
+    gene_index = 0
+    steps = 0
 
-    # Continue expanding until no non-terminals remain or genes exhausted
-    while "<" in expression and gene_index < len(genotype):
-
-        # Find the first non-terminal (string enclosed in '<' and '>')
+    while "<" in expression and steps < max_steps:
         start = expression.find("<")
         end = expression.find(">", start)
         if start == -1 or end == -1:
-            break  # No more non-terminals
+            break
 
-        non_terminal = expression[start:end + 1]  # Extract non-terminal
-
-        # Get possible productions for this non-terminal
+        non_terminal = expression[start:end + 1]
         productions = grammar.get_productions(non_terminal)
 
-        # Choose production using current gene (wrap around if necessary)
-        choice = genotype[gene_index] % len(productions)
+        if gene_index < len(genotype):
+            choice = genotype[gene_index] % len(productions)
+            gene_index += 1
+        else:
+            # Force safest production when genes are exhausted
+            if non_terminal == "<expr>":
+                choice = productions.index("<term>")
+            else:
+                choice = 0
 
-        # Replace the first occurrence of this non-terminal
         expression = expression[:start] + productions[choice] + expression[end + 1:]
+        steps += 1
 
-        gene_index += 1  # Move to next gene
+    if "<" in expression:
+        raise ValueError(f"Incomplete expansion: {expression}")
 
-    return expression
+    return " ".join(expression.split())
