@@ -8,6 +8,7 @@ This module handles:
 - Genotype → Phenotype mapping
 - Fitness evaluation with complexity penalty
 - Selection of best individuals
+- Multi-generation evolution (elitism + mutation)
 """
 
 import random
@@ -18,18 +19,6 @@ from src.complexity import final_score
 def initialize_population(pop_size, genotype_length):
     """
     Initialize a random population of genotypes.
-
-    Parameters
-    ----------
-    pop_size : int
-        Number of individuals in the population.
-    genotype_length : int
-        Length of each genotype (number of genes).
-
-    Returns
-    -------
-    list of list of int
-        Randomly generated genotypes.
     """
     return [
         [random.randint(0, 10) for _ in range(genotype_length)]
@@ -40,31 +29,10 @@ def initialize_population(pop_size, genotype_length):
 def evaluate_population(population, grammar, variable_values, alpha=1.0):
     """
     Evaluate all individuals in the population.
-
-    Maps each genotype to a phenotype using the grammar, 
-    then computes a final score combining fitness and complexity.
-
-    Parameters
-    ----------
-    population : list of list of int
-        List of genotypes.
-    grammar : Grammar
-        Grammar object for mapping genotypes.
-    variable_values : dict
-        Variable assignments for fitness evaluation.
-    alpha : float
-        Weight for complexity penalty.
-
-    Returns
-    -------
-    list of tuples
-        Each tuple contains (genotype, phenotype, final_score)
     """
     results = []
     for genotype in population:
-        # Map genotype to phenotype
         phenotype = map_genotype(genotype, grammar)
-        # Compute final score with complexity penalty
         score = final_score(phenotype, variable_values, alpha)
         results.append((genotype, phenotype, score))
     return results
@@ -72,20 +40,84 @@ def evaluate_population(population, grammar, variable_values, alpha=1.0):
 
 def select_best(evaluated_population, k=2):
     """
-    Select the top k individuals based on their final scores.
+    Select the top k individuals based on final score.
+    """
+    evaluated_population.sort(key=lambda x: x[2], reverse=True)
+    return evaluated_population[:k]
+
+
+def mutate(genotype, mutation_rate=0.1):
+    """
+    Mutate a genotype by randomly changing some genes.
+    """
+    new_genotype = genotype.copy()
+    for i in range(len(new_genotype)):
+        if random.random() < mutation_rate:
+            new_genotype[i] = random.randint(0, 10)
+    return new_genotype
+
+
+def run_gggp(
+    grammar,
+    variable_values,
+    pop_size=5,
+    genotype_length=10,
+    generations=10,
+    elite_size=2,
+    mutation_rate=0.1,
+    alpha=1.0,
+):
+    """
+    Run Grammar-Guided Genetic Programming for multiple generations.
 
     Parameters
     ----------
-    evaluated_population : list of tuples
-        Each tuple = (genotype, phenotype, final_score)
-    k : int
-        Number of individuals to select
+    grammar : Grammar
+        Grammar object
+    variable_values : dict
+        Variable assignments for fitness evaluation
+    pop_size : int
+        Population size
+    genotype_length : int
+        Length of each genotype
+    generations : int
+        Number of generations to evolve
+    elite_size : int
+        Number of best individuals preserved each generation
+    mutation_rate : float
+        Probability of mutating each gene
+    alpha : float
+        Complexity penalty weight
 
     Returns
     -------
     list of tuples
-        Top k individuals with highest scores.
+        Best individuals from the final generation
     """
-    # Sort descending by score
-    evaluated_population.sort(key=lambda x: x[2], reverse=True)
-    return evaluated_population[:k]
+    # ----- Generation 0 -----
+    population = initialize_population(pop_size, genotype_length)
+
+    for gen in range(generations):
+        print(f"\n=== Generation {gen} ===")
+
+        evaluated = evaluate_population(
+            population, grammar, variable_values, alpha
+        )
+
+        best = select_best(evaluated, k=elite_size)
+
+        for g, e, s in best:
+            print("Best phenotype:", e, "| Score:", s)
+
+        # ----- Create next generation -----
+        elites = [g for g, _, _ in best]
+        new_population = elites.copy()
+
+        while len(new_population) < pop_size:
+            parent = random.choice(elites)
+            child = mutate(parent, mutation_rate)
+            new_population.append(child)
+
+        population = new_population
+
+    return best
